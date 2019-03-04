@@ -1,0 +1,16 @@
+# A .gitignore file tells git to ignore certain file types in your repository.
+# For example, if I never want to track changes to, and upload, any Excel files, I would use:
+# *.xls
+# *.xlsx
+
+# It's a good idea to set this up when first creating the repository to avoid accidentally
+# saving or uploading files you don't want to share.
+
+# In my case I don't want to upload R temp files or my RStudio project:
+
+drive19.Rproj
+.Rhistory
+.Rapp.history
+.RData
+.RDataTmp
+.Rproj.user
