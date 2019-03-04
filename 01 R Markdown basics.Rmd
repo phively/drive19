@@ -1,0 +1,83 @@
+---
+title: "01 R Markdown basics"
+output:
+  html_notebook:
+    toc: TRUE
+    toc_float:
+      collapsed: FALSE
+---
+
+# Goal
+
+Demonstrate some of the basic features of an R Markdown notebook.
+
+# Metadata
+
+Various attributes, like title, output format, enabling a table of contents, showing/hiding all code chunks, etc. can be set at the top of the document, e.g.
+
+---
+title: "01 R Markdown basics"
+output: html_notebook
+---
+
+# Headers
+
+Use #, ##, ###, etc. to create various levels of headers and sub-headers. These will appear in the table of contents, if enabled. For example:
+
+# Top level
+
+## Second level
+
+### Third level
+
+# Basic formatting
+
+This is **bold** (__this too__)
+
+This is *italic* (_this too_)
+
+This is ^superscript^
+
+This is ~~strikethrough~~
+
+# More formatting
+
+This is a [hyperlink to case.org](https://www.case.org/)
+
+> This is a block quote
+
+1. Just add numbers
+2. To create
+3. An ordered list
+    a. And double tab
+    b. For levels
+
+* Or use *
+* To create bullets
+    + And double tab with +
+    + For levels
+
+# Equations
+
+Markdown supports LaTeX by enclosing the code in \$ for in-line equations and \$\$ for display equations.
+
+This is the inline equation for the standard Gaussian density: $\frac{1}{\sqrt{2\pi}} e^{-\frac{1}{2}x^2}$
+
+This is the display equation for the standard Gaussian density:
+
+$$ \frac{1}{\sqrt{2\pi}} e^{-\frac{1}{2}x^2} $$
+
+# Code
+
+R Markdown supports code chunks enclosed by \`\`\` and also inline code chunks with a single \`
+
+The characters immediately after the last \` determine the language, for example r for the R language.
+
+```{r}
+print('this is an R code chunk')
+sqrt(5)
+```
+
+Here's the inline version: `r I(print('this is an inline R code chunk but it just looks like normal text'))`
+
+Or combining inline LaTeX with an inline R chunk: $\sqrt{5}$ = `r I(sqrt(5))`

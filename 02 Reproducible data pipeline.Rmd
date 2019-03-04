@@ -1,0 +1,17 @@
+---
+title: "Reproducible data pipeline"
+output: html_notebook
+---
+
+# Goal
+
+This notebook walks through some 
+
+# Setting up an R session
+
+A fresh session will not have any packages or data loaded.
+
+```{r}
+
+```
+
