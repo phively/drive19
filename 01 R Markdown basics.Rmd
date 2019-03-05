@@ -15,10 +15,12 @@ Demonstrate some of the basic features of an R Markdown notebook.
 
 Various attributes, like title, output format, enabling a table of contents, showing/hiding all code chunks, etc. can be set at the top of the document, e.g.
 
+```{markdown}
 ---
 title: "01 R Markdown basics"
 output: html_notebook
 ---
+```
 
 # Headers
 
@@ -39,6 +41,8 @@ This is *italic* (_this too_)
 This is ^superscript^
 
 This is ~~strikethrough~~
+
+R notebooks also support many HTML tags, such as <u>underlining text</u>
 
 # More formatting
 
