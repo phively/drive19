@@ -5,13 +5,83 @@ output: html_notebook
 
 # Goal
 
-This notebook walks through some 
+This notebook demonstrates an automated data processing pipeline.
 
 # Setting up an R session
 
-A fresh session will not have any packages or data loaded.
+A fresh session will not have any packages or data loaded. I recommend Hadly Wickham's `tidyverse` packages for data manipulation, which contain many useful functions.
 
 ```{r}
-
+# Run this after installing a new version of R to download the most up-to-date version of the package
+install.packages('tidyverse')
 ```
 
+```{r}
+# Run this to load the package into the current session
+library(tidyverse)
+```
+
+# Loading the data
+
+R has built-in functions and packages to handle almost every conceivable file type. `read.csv` loads a csv file as a data frame.
+
+```{r}
+contribution <- read.csv(file = 'data/contribution.csv', stringsAsFactors = FALSE)
+```
+
+Examining the first few rows of data:
+
+```{r}
+head(contribution)
+```
+
+# Data manipulation
+
+The `tidyverse` packages provide an elegant way to script the sorts of data manipulation functions that are commonly performed manually: sorting, filtering, reordering, deleting, combining columns, creating derived columns, etc.
+
+For example, suppose each week an updated version of the contribution.csv file is created and a class lifetime giving report needs to be produced for alumni reunion attendees. This might take 10 minutes a week in Excel, or almost 9 hours a year, or a few seconds to run through an R script.
+
+```{r}
+# Load the file as a dataframe
+read.csv(file = 'data/contribution.csv') %>%
+  # Filter for event attendees
+  filter(AttendenceEvent == 1) %>%
+  # Define lifetime giving as the sum of 5 years of giving
+  mutate(LifetimeGiving = FY04Giving + FY03Giving + FY02Giving + FY01Giving + FY00Giving) %>%
+  # Group the remaining data by class year, and sum our new LifetimeGiving object within each year
+  group_by(Class.Year) %>%
+  summarise(ClassLifetimeGiving = sum(LifetimeGiving)) %>%
+  # Format as dollars
+  mutate(ClassLifetimeGiving = scales::dollar(ClassLifetimeGiving))
+```
+
+Note that a few lines of code can be run at a time to check that the results are as expected. Also, we'd just need to enter the new filename at the top to get updated results each week.
+
+# Merging datasets
+
+Another common Excel task is merging columns from different files, for example by VLOOKUP. This is very easy (and significantly faster for large files!) in R.
+
+Suppose we want to see the names of degrees awarded, not just the abbreviations. I mocked up a degree definition file:
+
+```{r}
+# Load the degrees
+degrees <- read.csv(file = 'data/degrees.csv', stringsAsFactors = FALSE)
+
+# Examine the first few rows
+head(degrees)
+```
+
+We can use the SQL-like join functions of `tidyverse` to append this column to the contribution dataset, for example:
+
+```{r, rows.print = 20}
+# The contribution data frame is the left table
+contribution %>% 
+  # Say we're only interested in class year and degree
+  select(Class.Year, Next.Degree) %>%
+  # The degrees data frame is the right table
+  left_join(degrees
+            # Join Next.Degree to Degree.Code
+            , by = c('Next.Degree' = 'Degree.Code')) %>%
+  # Look at the first 20 rows
+  head(20)
+```
