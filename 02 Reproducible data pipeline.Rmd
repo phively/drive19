@@ -1,5 +1,5 @@
 ---
-title: "Reproducible data pipeline"
+title: "02 Reproducible data pipeline"
 output: html_notebook
 ---
 
@@ -39,7 +39,7 @@ The `tidyverse` packages provide an elegant way to script the sorts of data mani
 
 For example, suppose each week an updated version of the contribution.csv file is created and a class lifetime giving report needs to be produced for alumni reunion attendees. This might take 10 minutes a week in Excel, or almost 9 hours a year, or a few seconds to run through an R script.
 
-```{r}
+```{r, cols.print = 12}
 # Load the file as a dataframe
 read.csv(file = 'data/contribution.csv') %>%
   # Filter for event attendees
@@ -69,7 +69,7 @@ A few lines of code can be run at a time to check that the results are as expect
 
 Another common Excel task is merging data from different files, for example by VLOOKUP. This is very easy (and significantly faster for large files!) in R.
 
-Suppose we want to see the names of degrees awarded, not just the abbreviations. I mocked up a degree definition file:
+Suppose we want to see the names of degrees awarded, not just the abbreviations. I mocked up a degree definition file with my best guess of what each degree code represents:
 
 ```{r}
 # Load the degrees
@@ -81,7 +81,7 @@ head(degrees)
 
 We can use the SQL-like join functions of `tidyverse` to append this column to the contribution dataset, for example:
 
-```{r, rows.print = 20}
+```{r, rows.print = 20, cols.print = 12}
 # The contribution data frame is the left table
 contribution %>%
   # Say we're only interested in class year and degree
@@ -93,6 +93,8 @@ contribution %>%
   # Look at the first 20 rows
   head(20)
 ```
+
+This is easily extended to an unlimited number of columns and scales much better than Excel's lookup functions.
 
 # Advanced examples
 

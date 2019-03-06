@@ -63,7 +63,7 @@ This is a [hyperlink to case.org](https://www.case.org/)
 
 # Equations
 
-Markdown supports LaTeX by enclosing the code in \$ for in-line equations and \$\$ for display equations.
+Markdown supports $\LaTeX{}$ by enclosing the code in \$ for in-line equations and \$\$ for display equations.
 
 This is the inline equation for the standard Gaussian density: $\frac{1}{\sqrt{2\pi}} e^{-\frac{1}{2}x^2}$
 
