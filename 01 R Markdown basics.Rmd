@@ -84,4 +84,6 @@ sqrt(5)
 
 Here's the inline version: `r I(print('this is an inline R code chunk but it just looks like normal text'))`
 
-Or combining inline LaTeX with an inline R chunk: $\sqrt{5}$ = `r I(sqrt(5))`
+Or combining inline $\LaTeX{}$ with an inline R chunk: $\sqrt{5}$ = `r I(sqrt(5))`
+
+This is incredibly powerful because later parts of a document can be dynamically updated based on what has happened above.
