@@ -6,8 +6,8 @@ Have you spent hours aggregating data, creating visualizations and writing up ta
 
 HTML rendered .Rmd files:
 
-[01 R Markdown basics](https://phively.github.io/drive19/01 R Markdown basics.nb.html)
+[01 R Markdown basics](https://phively.github.io/drive19/01%20R%20Markdown%20basics.nb.html)
 
-[02 Reproducible data pipeline](https://phively.github.io/drive19/02 Reproducible data pipeline.nb.html)
+[02 Reproducible data pipeline](https://phively.github.io/drive19/02%20Reproducible%20data%20pipeline.nb.html)
 
-[03 Reproducible reporting](https://phively.github.io/drive19/03 Reproducible reporting.nb.html)
+[03 Reproducible reporting](https://phively.github.io/drive19/03%20Reproducible%20reporting.nb.html)
