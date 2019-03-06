@@ -13,10 +13,8 @@ A fresh session will not have any packages or data loaded. I recommend Hadly Wic
 
 ```{r}
 # Run this after installing a new version of R to download the most up-to-date version of the package
-install.packages('tidyverse')
-```
+# install.packages('tidyverse')
 
-```{r}
 # Run this to load the package into the current session
 library(tidyverse)
 ```
@@ -31,7 +29,7 @@ contribution <- read.csv(file = 'data/contribution.csv', stringsAsFactors = FALS
 
 Examining the first few rows of data:
 
-```{r}
+```{r, cols.print = 12}
 head(contribution)
 ```
 
@@ -48,18 +46,28 @@ read.csv(file = 'data/contribution.csv') %>%
   filter(AttendenceEvent == 1) %>%
   # Define lifetime giving as the sum of 5 years of giving
   mutate(LifetimeGiving = FY04Giving + FY03Giving + FY02Giving + FY01Giving + FY00Giving) %>%
-  # Group the remaining data by class year, and sum our new LifetimeGiving object within each year
+  # Group the remaining data by class year, and compute the statistics of interest within each year
   group_by(Class.Year) %>%
-  summarise(ClassLifetimeGiving = sum(LifetimeGiving)) %>%
-  # Format as dollars
-  mutate(ClassLifetimeGiving = scales::dollar(ClassLifetimeGiving))
+  summarise(
+    Donors = sum(LifetimeGiving > 0)
+    , ClassGiving = sum(LifetimeGiving)
+  ) %>%
+  # We can easily compute derived statistics
+  mutate(
+    DollarsPerDonor = ClassGiving / Donors
+  ) %>%
+  # Format multiple columns as dollars
+  mutate_at(
+    .vars = vars(ClassGiving, DollarsPerDonor)
+    , .funs = function(x) {scales::dollar(x)}
+  )
 ```
 
-Note that a few lines of code can be run at a time to check that the results are as expected. Also, we'd just need to enter the new filename at the top to get updated results each week.
+A few lines of code can be run at a time to check that the results are as expected. Also, we'd just need to enter the new filename at the top to get updated results each week. Additionally, note that the original file was not modified at all -- the data pipeline lists all the steps carried out to generate the final result and runs practically instantaneously.
 
 # Merging datasets
 
-Another common Excel task is merging columns from different files, for example by VLOOKUP. This is very easy (and significantly faster for large files!) in R.
+Another common Excel task is merging data from different files, for example by VLOOKUP. This is very easy (and significantly faster for large files!) in R.
 
 Suppose we want to see the names of degrees awarded, not just the abbreviations. I mocked up a degree definition file:
 
@@ -75,7 +83,7 @@ We can use the SQL-like join functions of `tidyverse` to append this column to t
 
 ```{r, rows.print = 20}
 # The contribution data frame is the left table
-contribution %>% 
+contribution %>%
   # Say we're only interested in class year and degree
   select(Class.Year, Next.Degree) %>%
   # The degrees data frame is the right table
@@ -85,3 +93,10 @@ contribution %>%
   # Look at the first 20 rows
   head(20)
 ```
+
+# Advanced examples
+
+There's no limit to how many steps can be scripted. Here are a couple of my recent examples:
+
+  * [$10K donor model](https://github.com/phively/ksm-models/blob/master/af-10k-fy17/scripts/parse_data.R)
+  * [KSM prioritization score data pipeline](https://github.com/phively/ksm-models/blob/master/pg-cultivation-score-fy18/code/generate-pit-data.R)
