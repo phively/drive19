@@ -1,0 +1,311 @@
+---
+title: "03 Reproducible reporting"
+output: html_notebook
+---
+
+# Objective
+
+Let's analyze some randomly generated gift pipeline data. Suppose we have a set of proposals at different levels expected to close in 2019 or 2020. Can we make some projections on how much can realistically be raised?
+
+```{r setup, include=FALSE}
+# Hide code chunks so they don't appear in the final document
+library(knitr)
+knitr::opts_chunk$set(echo = FALSE)
+
+# Load packages
+library(ggplot2) # Pretty plots
+library(tidyverse) # Data wrangling
+library(lubridate) # Date functions
+library(kableExtra) # Table formatting
+```
+
+```{r parameters}
+### PARAMETER SECTION ###
+# Constants used later in the analysis
+campaign_end_dt <- lubridate::ymd('20200831') # Last day of campaign
+yearly_goal <- 50E6 # Assume a $50M yearly fundraising goal
+placeholder_disc <- .5 # Assumed discount rate of placeholder proposals
+p <- .25 # Assumed unconditional probability that a gift will close
+```
+
+```{r load_data}
+# Load sample pipeline data
+pipeline <- read.csv(
+  file = 'data/sample_pipeline.csv'
+  , stringsAsFactors = FALSE
+) %>% mutate(
+  # Convert text strings into factors for analysis
+  PROPOSAL_STATUS_CODE = factor(PROPOSAL_STATUS_CODE)
+  , PROPOSAL_STATUS = factor(PROPOSAL_STATUS)
+  # CLOSE_DT needs to be reformatted as a yyyy-mm-dd date object
+  , CLOSE_DT = ymd(CLOSE_DT)
+  # Placeholder proposals are closing on the campaign end date and are in anticipated status
+  , PLACEHOLDER = ifelse(CLOSE_DT == campaign_end_dt & PROPOSAL_STATUS_CODE == 'A', 'Y', 'N')
+)
+```
+
+```{r functions}
+# Function to format as dollars (in millions)
+mdollars <- function(nbr) {
+  paste0(
+    '$'
+    , {nbr/1000000} %>% formatC(format = 'f', big.mark = ',', digits = 1)
+    , 'M'
+  )
+}
+
+# Function to return summary statistics as dollars (in millions)
+stats <- function(sols) {
+  data.frame(
+    n = length(sols)
+    , StDev = sd(sols) %>% mdollars()
+    , min = min(sols) %>% mdollars()
+    , median = median(sols) %>% mdollars()
+    , mean = mean(sols) %>% mdollars()
+    , max = max(sols) %>% mdollars()
+  )
+}
+```
+
+# Data
+
+Proposals can be in 1 of `r pipeline %>% select(PROPOSAL_STATUS_CODE) %>% distinct() %>% nrow() %>% I()` different stages. Anticipated proposals are expected to be asked soon, submitted proposals have been presented to a prospective donor, and verbal proposals have been agreed to verbally but the signed documentation has not yet been returned. There are also two different dollar projections: ask amounts are presented to the prospective donor in the proposal, while anticipated amounts are what they are expected to agree to.
+
+# FY19 and FY20 Proposal Pipeline
+
+Here is the amount in the pipeline by proposal status and close date:
+
+```{r pipeline_summary}
+# Summarise by fiscal year and status
+pipe_summary <- pipeline %>%
+  group_by(CLOSE_FY, PROPOSAL_STATUS) %>%
+  summarise(
+    Ask = sum(ASK_AMT)
+    , Anticipated = sum(ANTIC_AMT)
+  ) %>%
+  group_by(CLOSE_FY) %>%
+  mutate(
+    FY_Ask_Total = sum(Ask)
+    , FY_Antic_Total = sum(Anticipated)
+  )
+
+# Dollars required to be raised
+antic <- pipe_summary %>% filter(PROPOSAL_STATUS == 'Verbal') %>% group_by(CLOSE_FY) %>% summarise(Anticipated = sum(Anticipated))
+antic19 <- antic %>% filter(CLOSE_FY == 2019) %>% select(Anticipated) %>% unlist()
+antic20 <- antic %>% filter(CLOSE_FY == 2020) %>% select(Anticipated) %>% unlist()
+fy19_needed <- yearly_goal - antic19
+fy20_needed <- yearly_goal - antic20
+
+# Summarize pipeline and print in a table
+pipe_summary %>%
+  mutate(
+    Ask = mdollars(Ask)
+    , Anticipated = mdollars(Anticipated)
+    , `FY Ask Total` = mdollars(FY_Ask_Total)
+    , `FY Anticipated Total` = mdollars(FY_Antic_Total)
+    , AntV = ifelse(CLOSE_FY == 2019, antic19, antic20) %>% mdollars()
+  ) %>%
+  select(`Close FY` = CLOSE_FY, `FY Anticipated Total`, `Anticipated Verbal` = AntV, `FY Ask Total`, Status = PROPOSAL_STATUS, Ask) %>%
+  spread(Status, Ask) %>%
+  kable() %>%
+  kable_styling()
+```
+
+# Some napkin math
+
+Assume the yearly goal is `r yearly_goal %>% mdollars() %>% I()` and that all verbals close at the anticipated level. Given the pipeline data, raising an additional `r paste(yearly_goal %>% mdollars(), '-', antic19 %>% mdollars(), '=', fy19_needed %>% mdollars()) %>% I()` in FY19 requires `r {fy19_needed/{pipe_summary %>% filter(CLOSE_FY == 2019 & PROPOSAL_STATUS %in% c('Anticipated', 'Submitted'))}$Ask %>% sum()} %>% scales::percent() %>% I()` of total anticipated/submitted asked dollars to close, and raising `r fy20_needed %>% mdollars() %>% I()` in FY20 requires `r {fy20_needed/{pipe_summary %>% filter(CLOSE_FY == 2020 & PROPOSAL_STATUS %in% c('Anticipated', 'Submitted'))}$Ask %>% sum()} %>% scales::percent() %>% I()` of total anticipated/submitted asked dollars to close.
+
+Additionally, I consider any anticipated proposal with a close date of `r campaign_end_dt %>% I()` (the last day of the campaign) to be a placeholder while the prospect is qualified. I'll discount placeholders to `r placeholder_disc %>% scales::percent() %>% I()` of their dollar value for projection purposes.
+
+```{r placeholders}
+# Computing dollar totals for placeholder proposals
+pipe_with_placeholder <- pipeline %>%
+  group_by(CLOSE_FY, PROPOSAL_STATUS) %>%
+  summarise(
+    Ask = sum(ASK_AMT)
+    , Anticipated = sum(ANTIC_AMT)
+    , Ask.Real = ifelse(PLACEHOLDER == 'N', ASK_AMT, 0) %>% sum()
+    , Ask.Placeholder = ifelse(PLACEHOLDER == 'Y', ASK_AMT, 0) %>% sum()
+    , Antic.Real = ifelse(PLACEHOLDER == 'N', ANTIC_AMT, 0) %>% sum()
+    , Antic.Placeholder = ifelse(PLACEHOLDER == 'Y', ANTIC_AMT, 0) %>% sum()
+  ) %>%
+  group_by(CLOSE_FY) %>%
+  mutate(
+    FY_Ask_Real = sum(Ask.Real)
+    , FY_Ask_Placeholder = sum(Ask.Placeholder)
+    , FY_Antic_Total = sum(Anticipated)
+    , FY_Antic_Real = sum(Antic.Real)
+    , FY_Antic_Placeholder = sum(Antic.Placeholder)
+  )
+
+# Summarize placeholders and print in a table
+pipe_with_placeholder %>%
+  filter(CLOSE_FY == 2020) %>%
+  mutate(
+    Ask = mdollars(Ask)
+    , `FY Ask` = mdollars(FY_Ask_Real)
+    , `FY Ask Placeholder` = mdollars(FY_Ask_Placeholder)
+    , `FY Anticipated` = mdollars(FY_Antic_Real)
+    , `FY Anticipated Placeholder` = mdollars(FY_Antic_Placeholder)
+  ) %>%
+  select(`Close FY` = CLOSE_FY, `FY Anticipated`, `FY Anticipated Placeholder`, `FY Ask`
+         , `FY Ask Placeholder`, Status = PROPOSAL_STATUS, Ask) %>%
+  spread(Status, Ask) %>%
+  kable() %>%
+  kable_styling()
+```
+
+# Pipeline Simulation
+
+To determine how likely various fundraising outcomes may be, I'll run a Monte Carlo simulation for each fiscal year. I've seen various industry standards suggesting major gift asked dollars close between a 16% (1/6) to 66% (2/3) rate depending on proposal progress and a prospect's placement in the prospect lifecycle. We can also use gift officer generated probability estimates with the anticipated amounts to provide a second set of possible outcomes.
+
+```{r sims}
+# Generate probability vectors for Monte Carlo style simulation
+iter <- 2500
+
+# Set seed for reproducible results
+set.seed(89254)
+
+# Ask probability matrix
+# Uniformly generate on (0, 1); success occurs when x <= p
+pask <- matrix(
+  runif(nrow(pipeline) * iter)
+  , nrow = iter
+  , ncol = nrow(pipeline)
+)
+pask <- ifelse(pask <= p, 1, 0)
+
+# Anticipated probability matrix
+# Generate Bernoulli outcomes, with p set by the gift officer probabilities, or p above if unavailable
+pantic <- pipeline %>% select(PROBABILITY) %>% replace_na(list(PROBABILITY = p)) %>% unlist() %>% as.vector()
+pantic <- rep(pantic, times = iter)
+pantic <- sapply(pantic, FUN = function(x) rbernoulli(1, x))
+# Construct matrix; note the t() at the end, as matrix() fills an entire column before moving right one row
+pantic <- matrix(
+  pantic
+  , nrow = nrow(pipeline)
+  , ncol = iter
+) %>% t()
+
+# Compute simulation results
+sol_sims <- data.frame(
+  FY19.Asks = pask %*% ifelse(
+    pipeline$CLOSE_FY == 2019
+    , pipeline$ASK_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', placeholder_disc, 1)
+    , 0
+  )
+  , FY20.Asks = pask %*% ifelse(
+    pipeline$CLOSE_FY == 2020
+    , pipeline$ASK_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', placeholder_disc, 1)
+    , 0
+  )
+  , FY19.Anticipated = pantic %*% ifelse(
+    pipeline$CLOSE_FY == 2019
+    , pipeline$ANTIC_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', placeholder_disc, 1)
+    , 0
+  )
+  , FY20.Anticipated = pantic %*% ifelse(
+    pipeline$CLOSE_FY == 2020
+    , pipeline$ANTIC_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', placeholder_disc, 1)
+    , 0
+  )
+) %>% gather(
+  "simulation", "dollars", 1:4
+) %>% mutate(
+  year = case_when(
+    str_detect(simulation, '19') ~ 2019
+    , str_detect(simulation, '20') ~ 2020
+  )
+  , simulation = factor(simulation) %>% forcats::fct_inorder()
+)
+```
+
+Assuming $p =$ `r round(p, digits = 3) %>% I()` as the baseline close rate and discounting placeholder proposals to `r round(placeholder_disc, digits = 3) %>% scales::percent() %>% I()` of their face amount yields the following simulations.
+
+```{r sim_results}
+# Compute dollars raised in each simulation and print as a table
+rbind(
+  `FY19 Asks` = stats(pask %*% ifelse(
+    pipeline$CLOSE_FY == 2019
+    , pipeline$ASK_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', .5, 1)
+    , 0
+  ))
+  , `FY20 Asks` = stats(pask %*% ifelse(
+    pipeline$CLOSE_FY == 2020
+    , pipeline$ASK_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', .5, 1)
+    , 0
+  ))
+  , `FY19 Anticipated` = stats(pantic %*% ifelse(
+    pipeline$CLOSE_FY == 2019
+    , pipeline$ANTIC_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', .5, 1)
+    , 0
+  ))
+  , `FY20 Anticipated` = stats(pantic %*% ifelse(
+    pipeline$CLOSE_FY == 2020
+    , pipeline$ANTIC_AMT * ifelse(pipeline$PLACEHOLDER == 'Y', .5, 1)
+    , 0
+  ))
+) %>% kable() %>%
+  kable_styling()
+```
+
+```{r sim_plot, message = FALSE, warning = FALSE, error = FALSE}
+# Average result across simulations
+pipeavg <- function(simulation_name) {
+  sol_sims %>% filter(simulation == simulation_name) %>% select(dollars) %>% unlist() %>% mean()
+}
+
+# Plot results
+sol_sims %>%
+  ggplot(aes(x = dollars, color = simulation)) +
+  geom_density(size = 1) +
+  geom_vline(xintercept = pipeavg('FY19.Asks'), linetype = 'dashed', color = 'red') +
+  geom_vline(xintercept = pipeavg('FY20.Asks'), linetype = 'dashed', color = 'chartreuse4') +
+  geom_vline(xintercept = pipeavg('FY19.Anticipated'), linetype = 'dashed', color = 'turquoise') +
+  geom_vline(xintercept = pipeavg('FY20.Anticipated'), linetype = 'dashed', color = 'purple') +
+  scale_x_continuous(labels = scales::dollar) +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 1E-7)) +
+  labs(x = 'Dollars', y = 'probability density')
+```
+
+Simulations based on anticipated amounts and anticipated close probabilities are significantly more optimistic than those based on ask amounts and standard industry close probabilities. On average, `r sum(pipeavg('FY19.Asks') >= yearly_goal, pipeavg('FY20.Asks') >= yearly_goal, pipeavg('FY19.Anticipated') >= yearly_goal, pipeavg('FY20.Anticipated') >= yearly_goal) %>% I()` of the `r sol_sims$simulation %>% levels() %>% length() %>% I()` simulations yields results above the `r yearly_goal %>% mdollars() %>% I()` yearly goal.
+
+# Expected Range of FY19 Outcomes
+
+Consider the FY19 Asks model as the more conservative FY19 projection. Dividing the expected giving ranges into quantiles:
+
+```{r plot_quantiles}
+# Quantile vector
+fy19_asks <- sol_sims %>% filter(simulation == 'FY19.Asks') %>% select(dollars) %>% unlist()
+qvec <- seq(.0, 1, by = .2)
+smoothed <- density(fy19_asks)
+smoothed <- data.frame(x = smoothed$x, y = smoothed$y)
+quants <- quantile(fy19_asks, prob = qvec)
+smoothed$quants <- findInterval(smoothed$x, quants) %>% factor()
+
+# Plotting function which can be re-used for other years
+quant_density <- function(data, quantiles, label, color, palette) {
+  data %>%
+    ggplot(aes(x = x/1E6, y = y)) +
+    geom_line(aes(color = label), color = color, size = 1) +
+    geom_ribbon(aes(ymin = 0, ymax = y, fill = quants), alpha = .5) +
+    geom_vline(xintercept = pipeavg(label)/1E6, linetype = 'dashed', color = color) +
+    scale_x_continuous(
+      labels = scales::dollar
+      , breaks = c(quantiles/1E6, pipeavg(label)/1E6)
+      , minor_breaks = seq(0, 60, by = 10)
+    ) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 1E-7)) +
+    scale_fill_brewer(guide = 'none', palette = palette) +
+    labs(title = paste(label, 'simulation'), x = 'Dollars (millions)', y = 'probability density', color = 'simulation') +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+      , panel.grid.major.x = element_line(color = 'lightgray')
+    )
+}
+
+# Plot results for FY19 simulation
+quant_density(smoothed, quants, 'FY19.Asks', 'red', 'Reds')
+```
+
+60% of the simulated FY19 outcomes were between `r quants['20%'] %>% round(1) %>% mdollars() %>% I()` and `r quants['80%'] %>% round(1) %>% mdollars() %>% I()` and the average outcome was `r pipeavg('FY19.Asks') %>% mdollars() %>% I()`, which is `r ifelse(pipeavg('FY19.Asks') >= yearly_goal, 'more', 'less') %>% I()` than the `r yearly_goal %>% mdollars() %>% I()` goal.
